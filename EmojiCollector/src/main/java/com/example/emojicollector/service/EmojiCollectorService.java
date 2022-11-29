@@ -2,47 +2,31 @@ package com.example.emojicollector.service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.springframework.http.HttpEntity;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import com.example.emojicollector.dto.EmojiDto;
 import com.example.emojicollector.dto.EmojiDtoToClient;
 import com.example.emojicollector.errors.EmojiNotFoundException;
 import com.example.emojicollector.errors.ErrorMessages;
 import com.example.emojicollector.errors.FieldInvalidException;
+import com.example.emojicollector.feign.EmojiCollectorFeign;
 import com.example.emojicollector.model.Emoji;
 import com.example.emojicollector.repository.EmojiCollectorRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Service
+@RequiredArgsConstructor
 public class EmojiCollectorService {
 
 	EmojiCollectorRepository emojiCollectorRepository;
-
-	EmojiCollectorService(EmojiCollectorRepository emojiCollectorRepository){
-		this.emojiCollectorRepository = emojiCollectorRepository;
-	}
+	EmojiCollectorFeign emojiCollectorFeign;
 
 	public List<Emoji> getEmojiFromProvider() {
-		CompletableFuture<List<EmojiDto>> cf =  WebClient.create("http://localhost:9090/api/provider")
-				.get()
-				.accept(MediaType.APPLICATION_JSON)
-				.retrieve()
-				.toEntityList(EmojiDto.class)
-				.mapNotNull(HttpEntity::getBody)
-				.toFuture();
-
-		try {
-			return cf.get().stream().map(EmojiDto::convertDtoToEmoji).collect(Collectors.toList());
-		} catch (InterruptedException | ExecutionException e) {
-			throw new RuntimeException(e);
-		}
+		return emojiCollectorFeign.getEmojiFromProvider().stream().map(EmojiDto::convertDtoToEmoji).collect(Collectors.toList());
 	}
 
 	public long saveAllEmojiToDB()  {
@@ -161,14 +145,13 @@ public class EmojiCollectorService {
 	}
 	public EmojiDtoToClient updateEmoji(EmojiDto emojiDto, long id) {
 		Emoji emoji = getEmojiId(id).toBuilder().
-						name(emojiDto.getName()).
-						category(emojiDto.getCategory()).
-						group(emojiDto.getGroup()).
-						htmlCode(new ArrayList<>(emojiDto.getHtmlCode())).
-						unicode(new ArrayList<>(emojiDto.getUnicode())).
-						build();
+				name(emojiDto.getName()).
+				category(emojiDto.getCategory()).
+				group(emojiDto.getGroup()).
+				htmlCode(new ArrayList<>(emojiDto.getHtmlCode())).
+				unicode(new ArrayList<>(emojiDto.getUnicode())).
+				build();
 
 		return EmojiDtoToClient.convertEmojiToClient(emojiCollectorRepository.save(emoji));
 	}
 }
-
